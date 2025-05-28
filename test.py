@@ -40,7 +40,7 @@ def extract_foreground(rgb_image, mask):
 
 # Load and preprocess example images (replace with your own image paths)
 # 文件夹路径
-folder_path = "/home/mj/Desktop/计算机视觉中期作业_马婧/project/dataset/data1-humanbody1"
+folder_path = "dataset/data1-humanbody1"
 
 # 获取所有RGB图像和掩码图像的路径
 rgb_images = sorted([os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.startswith("rgb_") and not f.startswith("rgb_foreground_") and f.endswith(".png")])
@@ -55,13 +55,17 @@ foreground_images = [extract_foreground(cv2.imread(rgb_image), cv2.imread(mask_i
 # 保存前景图像到临时文件夹
 foreground_image_paths = []
 for i, foreground_image in enumerate(foreground_images):
-    temp_path = os.path.join('/home/mj/Desktop/计算机视觉中期作业_马婧/project/dataset/data1-humanbody1', f"foreground_{i}.png")
+    temp_path = os.path.join('dataset/data1-humanbody1', f"foreground_{i}.png")
     cv2.imwrite(temp_path, foreground_image)
     foreground_image_paths.append(temp_path)
 
 # 加载并预处理图像
 images = load_and_preprocess_images(foreground_image_paths).to(device)
-breakpoint()
+# breakpoint()
+
+# 指定保存文件夹路径
+output_folder = "dataset/data1-humanbody1/vggt_output"
+os.makedirs(output_folder, exist_ok=True)
 
 with torch.no_grad():
     with torch.cuda.amp.autocast(dtype=dtype):
@@ -72,18 +76,37 @@ with torch.no_grad():
     pose_enc = model.camera_head(aggregated_tokens_list)[-1]
     # Extrinsic and intrinsic matrices, following OpenCV convention (camera from world)
     extrinsic, intrinsic = pose_encoding_to_extri_intri(pose_enc, images.shape[-2:])
+    print("extrinsic shape:", extrinsic.shape)
+    print("intrinsic shape:", intrinsic.shape)
+    # print("extrinsic:", extrinsic)
+    # print("intrinsic:", intrinsic)
+
+    # 保存相机内外参数
+    # extrinsic: [1, 16, 3, 4], intrinsic: [1, 16, 3, 3]
+    extrinsic = extrinsic.squeeze(0)  # [16, 3, 4]
+    intrinsic = intrinsic.squeeze(0)  # [16, 3, 3]
+    assert extrinsic.shape[0] == len(foreground_image_paths)
+    assert intrinsic.shape[0] == len(foreground_image_paths)
+
+    for i in range(len(foreground_image_paths)):
+        extrinsic_path = os.path.join(output_folder, f"extrinsics_{i}.npy")
+        intrinsic_path = os.path.join(output_folder, f"intrinsics_{i}.npy")
+        np.save(extrinsic_path, extrinsic[i].cpu().numpy())
+        np.save(intrinsic_path, intrinsic[i].cpu().numpy())
 
     # Predict Depth Maps
     depth_map, depth_conf = model.depth_head(aggregated_tokens_list, images, ps_idx)
 
     # Predict Point Maps
     point_map, point_conf = model.point_head(aggregated_tokens_list, images, ps_idx)
+    print("point_map shape:", point_map.shape)  
         
     # Construct 3D Points from Depth Maps and Cameras
     # which usually leads to more accurate 3D points than point map branch
     point_map_by_unprojection = unproject_depth_map_to_point_map(depth_map.squeeze(0), 
                                                                 extrinsic.squeeze(0), 
                                                                 intrinsic.squeeze(0))
+    print("point_map_by_unprojection shape:", point_map_by_unprojection.shape)
 
     # Predict Tracks
     # choose your own points to track, with shape (N, 2) for one scene

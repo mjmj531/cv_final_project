@@ -150,3 +150,6 @@ skyseg.onnx
 
 # example pics
 examples/
+
+# dataset
+dataset/
