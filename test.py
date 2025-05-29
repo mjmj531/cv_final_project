@@ -23,20 +23,38 @@ model = VGGT.from_pretrained("facebook/VGGT-1B").to(device)
 # _URL = "https://huggingface.co/facebook/VGGT-1B/resolve/main/model.pt"
 # model.load_state_dict(torch.hub.load_state_dict_from_url(_URL))
 
-def extract_foreground(rgb_image, mask):
-    """使用掩码提取前景(人体)，去除背景"""
-    # 确保掩码是二值图像
+# def extract_foreground(rgb_image, mask):
+#     """使用掩码提取前景(人体)，去除背景"""
+#     # 确保掩码是二值图像
+#     if len(mask.shape) > 2:
+#         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+    
+#     # 二值化处理，确保掩码为0和255
+#     _, binary_mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
+    
+#     # 创建只有前景的图像
+#     foreground = np.zeros_like(rgb_image)
+#     foreground[:] = 255  # Set the entire image to white initially
+#     foreground[binary_mask > 0] = rgb_image[binary_mask > 0]  # Replace foreground pixels with original RGB values
+    
+#     return foreground
+
+def extract_foreground_with_alpha(rgb_image, mask):
+    """返回带透明通道的前景图像 (RGBA)"""
+    import cv2
+    import numpy as np
+
     if len(mask.shape) > 2:
         mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-    
-    # 二值化处理，确保掩码为0和255
+
     _, binary_mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
-    
-    # 创建只有前景的图像
-    foreground = np.zeros_like(rgb_image)
-    foreground[binary_mask > 0] = rgb_image[binary_mask > 0]
-    
-    return foreground
+
+    # 创建 RGBA 图像
+    b, g, r = cv2.split(rgb_image)
+    alpha = binary_mask
+    rgba = cv2.merge([b, g, r, alpha])
+
+    return rgba
 
 # Load and preprocess example images (replace with your own image paths)
 # 文件夹路径
@@ -50,7 +68,7 @@ mask_images = sorted([os.path.join(folder_path, f) for f in os.listdir(folder_pa
 assert len(rgb_images) == len(mask_images), "RGB images and mask images count do not match."
 
 # 加载图像并提取前景
-foreground_images = [extract_foreground(cv2.imread(rgb_image), cv2.imread(mask_image)) for rgb_image, mask_image in zip(rgb_images, mask_images)]
+foreground_images = [extract_foreground_with_alpha(cv2.imread(rgb_image), cv2.imread(mask_image)) for rgb_image, mask_image in zip(rgb_images, mask_images)]
 
 # 保存前景图像到临时文件夹
 foreground_image_paths = []

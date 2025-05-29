@@ -212,7 +212,10 @@ def viser_wrapper(
             selected_idx = int(gui_frame_selector.value)
             frame_mask = frame_indices == selected_idx
 
-        combined_mask = conf_mask & frame_mask
+        # Exclude white points (color [255, 255, 255])
+        non_white_mask = ~np.all(colors_flat == [255, 255, 255], axis=1)
+
+        combined_mask = conf_mask & frame_mask & non_white_mask
         point_cloud.points = points_centered[combined_mask]
         point_cloud.colors = colors_flat[combined_mask]
 
