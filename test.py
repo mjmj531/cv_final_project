@@ -73,7 +73,7 @@ foreground_images = [extract_foreground_with_alpha(cv2.imread(rgb_image), cv2.im
 # 保存前景图像到临时文件夹
 foreground_image_paths = []
 for i, foreground_image in enumerate(foreground_images):
-    temp_path = os.path.join('dataset/data1-humanbody1', f"foreground_{i}.png")
+    temp_path = os.path.join('dataset/data1-humanbody1/raw_pic', f"foreground_{i}.png")
     cv2.imwrite(temp_path, foreground_image)
     foreground_image_paths.append(temp_path)
 
@@ -125,9 +125,7 @@ with torch.no_grad():
                                                                 extrinsic.squeeze(0), 
                                                                 intrinsic.squeeze(0))
     print("point_map_by_unprojection shape:", point_map_by_unprojection.shape)
-
-    # Predict Tracks
-    # choose your own points to track, with shape (N, 2) for one scene
-    query_points = torch.FloatTensor([[100.0, 200.0], 
-                                        [60.72, 259.94]]).to(device)
-    track_list, vis_score, conf_score = model.track_head(aggregated_tokens_list, images, ps_idx, query_points=query_points[None])
+    # save point_map_by_unprojection
+    for i in range(len(foreground_image_paths)):
+        point_map_path = os.path.join(output_folder, f"point_map_{i}.npy")
+        np.save(point_map_path, point_map_by_unprojection[i])
